@@ -6,18 +6,18 @@ import json
 
 app = FastAPI()
 
+# Получаем переменные окружения
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 OPENROUTER_KEY = os.getenv("OPENROUTER_KEY")
 PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
 
+# Проверка наличия всех необходимых переменных
 if not VERIFY_TOKEN or not OPENROUTER_KEY or not PAGE_ACCESS_TOKEN:
     raise Exception("Не установлены переменные окружения: VERIFY_TOKEN, OPENROUTER_KEY или PAGE_ACCESS_TOKEN")
-
 
 @app.get("/")
 def root():
     return {"status": "OK"}
-
 
 @app.get("/webhook")
 def verify_webhook(request: Request):
@@ -26,7 +26,6 @@ def verify_webhook(request: Request):
     if args.get("hub.mode") == "subscribe" and args.get("hub.verify_token") == VERIFY_TOKEN:
         return PlainTextResponse(content=args.get("hub.challenge"), status_code=200)
     return {"status": "Verification failed"}
-
 
 @app.post("/webhook")
 async def handle_webhook(request: Request):
@@ -50,12 +49,11 @@ async def handle_webhook(request: Request):
 
     return {"status": "ok"}
 
-
 async def ask_gpt(user_message):
     """Отправка запроса к OpenRouter GPT-4o"""
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}",
-        "HTTP-Referer": "https://photonewborn.taplink.ws",  # твой домен
+        "HTTP-Referer": "https://photonewborn.taplink.ws",  # Замени на свой домен
         "X-Title": "Newborn Assistant"
     }
 
@@ -93,7 +91,6 @@ async def ask_gpt(user_message):
     data = response.json()
     return data["choices"][0]["message"]["content"]
 
-
 async def send_reply_to_instagram(user_id, message_text):
     """Отправка ответа обратно в Instagram Direct"""
     url = f"https://graph.facebook.com/v18.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
@@ -106,3 +103,8 @@ async def send_reply_to_instagram(user_id, message_text):
         response = await client.post(url, json=payload)
         if response.status_code != 200:
             print("Ошибка отправки сообщения:", response.status_code, response.text)
+
+# 🔥 Для запуска на Railway
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
