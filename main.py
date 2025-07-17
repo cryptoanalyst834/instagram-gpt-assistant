@@ -7,7 +7,7 @@ load_dotenv()
 
 app = FastAPI()
 
-VERIFY_TOKEN = os.getenv("FB_VERIFY_TOKEN")
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 ACCESS_TOKEN = os.getenv("IG_ACCESS_TOKEN")
 
 
