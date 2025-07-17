@@ -8,34 +8,25 @@ load_dotenv()
 app = FastAPI()
 
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "ai24verifytoken")
-ACCESS_TOKEN = os.getenv("IG_ACCESS_TOKEN", "your-instagram-token")
 
 
-@app.get("/")
+@app.get("/webhook")
 async def verify_webhook(request: Request):
-    """
-    Верификация webhook от Meta (Instagram)
-    """
     params = request.query_params
     mode = params.get("hub.mode")
     token = params.get("hub.verify_token")
     challenge = params.get("hub.challenge")
 
+    print("🔍 Проверка webhook:", params)
+
     if mode == "subscribe" and token == VERIFY_TOKEN:
-        print("✅ Верификация Meta Webhook пройдена")
         return PlainTextResponse(content=challenge, status_code=200)
     else:
-        print("❌ Ошибка верификации webhook:", params)
         return PlainTextResponse(content="Verification failed", status_code=403)
 
 
-@app.post("/")
+@app.post("/webhook")
 async def receive_webhook(request: Request):
-    """
-    Приём POST-сообщений от Instagram API
-    """
     body = await request.json()
-    print("📩 Получено событие от Instagram API:", body)
-
-    # Здесь можно добавить пересылку в Telegram, запись в лог и т.п.
+    print("📩 Событие от Instagram:", body)
     return JSONResponse(content={"status": "received"}, status_code=200)
