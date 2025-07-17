@@ -1,44 +1,46 @@
-from flask import Flask, request
+from fastapi import FastAPI, Request
+from dotenv import load_dotenv
 import os
-from ai_logic import process_message
-from telegram_notify import send_telegram
-from google_sheets import write_to_sheet
-from scheduler import save_lead  # сохраняем в SQLite для дожима
+import uvicorn
 
-app = Flask(__name__)
+load_dotenv()
 
-@app.route('/webhook', methods=['GET', 'POST'])
-def webhook():
-    # 🔹 Проверка токена от Meta (GET-запрос)
-    if request.method == 'GET':
-        verify_token = request.args.get('hub.verify_token')
-        challenge = request.args.get('hub.challenge')
-        if verify_token == os.getenv("VERIFY_TOKEN"):
-            return challenge, 200
-        else:
-            return "Verification token mismatch", 403
+app = FastAPI()
 
-    # 🔹 Обработка входящих сообщений (POST-запрос)
-    if request.method == 'POST':
-        data = request.json
+VERIFY_TOKEN = os.getenv("FB_VERIFY_TOKEN")
+ACCESS_TOKEN = os.getenv("IG_ACCESS_TOKEN")
 
-        try:
-            entry = data.get("entry", [])[0]
-            messaging = entry.get("messaging", [])[0]
-            sender_id = messaging["sender"]["id"]
-            message_text = messaging["message"]["text"]
-        except Exception as e:
-            return {"error": str(e)}, 400
 
-        # 🔹 Обрабатываем сообщение через GPT
-        reply, log_data = process_message(message_text, sender_id)
+@app.get("/")
+async def root():
+    return {"status": "Webhook server is running."}
 
-        # 🔹 Логируем
-        send_telegram(log_data)
-        write_to_sheet(log_data)
-        save_lead(sender_id, message_text, reply)
 
-        return {"status": "ok"}, 200
+@app.get("/webhook")
+async def verify_webhook(request: Request):
+    """
+    Подтверждение Webhook от Meta (GET-запрос)
+    """
+    params = dict(request.query_params)
+    if (
+        params.get("hub.mode") == "subscribe"
+        and params.get("hub.verify_token") == VERIFY_TOKEN
+    ):
+        return int(params["hub.challenge"])
+    return {"status": "Verification token mismatch"}, 403
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
+
+@app.post("/webhook")
+async def receive_webhook(request: Request):
+    """
+    Получение событий от Instagram (POST-запрос)
+    """
+    data = await request.json()
+    print("🔔 Новое событие от Instagram:", data)
+
+    # Здесь можно добавить отправку в Telegram, логику обработки и т.п.
+    return {"status": "received"}
+
+
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
