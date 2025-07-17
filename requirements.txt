@@ -3,3 +3,6 @@ openai
 requests
 gspread
 oauth2client
+fastapi
+uvicorn
+python-dotenv
