@@ -4,5 +4,5 @@ requests
 gspread
 oauth2client
 fastapi
-uvicorn
+uvicorn[standard]
 python-dotenv
