@@ -1,5 +1,5 @@
-fastapi
-uvicorn
-httpx
+Flask
+openai
+requests
 gspread
-google-auth
+oauth2client
