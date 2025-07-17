@@ -27,7 +27,7 @@ async def verify_webhook(request: Request):
     challenge = params.get("hub.challenge")
 
     if mode == "subscribe" and token == VERIFY_TOKEN:
-        return PlainTextResponse(content=challenge, status_code=200)
+        return PlainTextResponse(content=str(challenge), status_code=200)
     else:
         return PlainTextResponse(content="Verification failed", status_code=403)
 
@@ -40,5 +40,5 @@ async def receive_webhook(request: Request):
     data = await request.json()
     print("📩 Получено сообщение от Meta:", data)
 
-    # Место для обработки событий Instagram (например, пересылка в Telegram)
+    # Здесь можно добавить логику пересылки сообщений в Telegram, запись в БД и т.д.
     return JSONResponse(content={"status": "received"}, status_code=200)
