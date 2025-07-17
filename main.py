@@ -8,18 +8,13 @@ load_dotenv()
 app = FastAPI()
 
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "ai24verifytoken")
-ACCESS_TOKEN = os.getenv("IG_ACCESS_TOKEN", "secret_if_needed")
+ACCESS_TOKEN = os.getenv("IG_ACCESS_TOKEN", "your-instagram-token")
 
 
 @app.get("/")
-async def root():
-    return {"status": "Webhook server is running."}
-
-
-@app.get("/webhook")
 async def verify_webhook(request: Request):
     """
-    Подтверждение Webhook от Meta (GET-запрос)
+    Верификация webhook от Meta (Instagram)
     """
     params = request.query_params
     mode = params.get("hub.mode")
@@ -27,18 +22,20 @@ async def verify_webhook(request: Request):
     challenge = params.get("hub.challenge")
 
     if mode == "subscribe" and token == VERIFY_TOKEN:
-        return PlainTextResponse(content=str(challenge), status_code=200)
+        print("✅ Верификация Meta Webhook пройдена")
+        return PlainTextResponse(content=challenge, status_code=200)
     else:
+        print("❌ Ошибка верификации webhook:", params)
         return PlainTextResponse(content="Verification failed", status_code=403)
 
 
-@app.post("/webhook")
+@app.post("/")
 async def receive_webhook(request: Request):
     """
-    Получение событий от Instagram (POST-запрос)
+    Приём POST-сообщений от Instagram API
     """
-    data = await request.json()
-    print("📩 Получено сообщение от Meta:", data)
+    body = await request.json()
+    print("📩 Получено событие от Instagram API:", body)
 
-    # Здесь можно добавить логику пересылки сообщений в Telegram, запись в БД и т.д.
+    # Здесь можно добавить пересылку в Telegram, запись в лог и т.п.
     return JSONResponse(content={"status": "received"}, status_code=200)
