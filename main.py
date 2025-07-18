@@ -1,79 +1,70 @@
-import os
-import requests
 from flask import Flask, request
-from dotenv import load_dotenv
-
-load_dotenv()
-
-ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
-VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "ai24verifytoken")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+import requests
+import os
 
 app = Flask(__name__)
 
-# ✅ Проверка webhook при подключении от Meta
-@app.route('/webhook', methods=['GET'])
-def verify():
-    if request.args.get("hub.mode") == "subscribe" and request.args.get("hub.verify_token") == VERIFY_TOKEN:
-        print("WEBHOOK_VERIFIED")
-        return request.args.get("hub.challenge"), 200
-    return "Verification token mismatch", 403
+ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# ✅ Обработка входящих сообщений от Instagram
-@app.route('/webhook', methods=['POST'])
+@app.route("/", methods=["GET"])
+def index():
+    return "Instagram GPT Assistant is running", 200
+
+@app.route("/webhook", methods=["GET", "POST"])
 def webhook():
-    data = request.get_json()
-    print("Получено сообщение:", data)
+    if request.method == "GET":
+        if request.args.get("hub.mode") == "subscribe" and request.args.get("hub.verify_token") == VERIFY_TOKEN:
+            print("WEBHOOK_VERIFIED")
+            return request.args.get("hub.challenge"), 200
+        return "Verification token mismatch", 403
 
-    try:
-        for entry in data.get("entry", []):
-            for change in entry.get("changes", []):
-                value = change.get("value", {})
-                messages = value.get("messages")
-                if messages:
-                    for message in messages:
-                        sender_id = message["from"]
-                        text = message.get("text", {}).get("body")
-                        if text:
-                            reply = generate_ai_reply(text)
-                            send_message(sender_id, reply)
-    except Exception as e:
-        print("Ошибка обработки входящего запроса:", e)
+    elif request.method == "POST":
+        data = request.get_json()
+        print("Received:", data)
 
-    return "OK", 200
+        if data["object"] == "instagram":
+            for entry in data["entry"]:
+                for message in entry["messaging"]:
+                    if "message" in message:
+                        sender_id = message["sender"]["id"]
+                        user_message = message["message"]["text"]
 
-# ✅ Генерация ответа через OpenRouter API
-def generate_ai_reply(message_text):
-    try:
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "model": "openrouter/cinematika-7b",  # можно заменить на другой
-            "messages": [
-                {"role": "system", "content": "Ты дружелюбный ассистент Instagram-бота."},
-                {"role": "user", "content": message_text}
-            ]
-        }
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
-        result = response.json()
-        return result["choices"][0]["message"]["content"]
-    except Exception as e:
-        print("Ошибка генерации ответа:", e)
-        return "Извините, возникла ошибка при генерации ответа."
+                        reply = generate_openrouter_reply(user_message)
+                        send_instagram_reply(sender_id, reply)
 
-# ✅ Отправка сообщения обратно в Instagram Direct
-def send_message(recipient_id, text):
-    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={ACCESS_TOKEN}"
-    headers = {"Content-Type": "application/json"}
-    payload = {
-        "messaging_type": "RESPONSE",
-        "recipient": {"id": recipient_id},
-        "message": {"text": text}
+        return "OK", 200
+
+
+def generate_openrouter_reply(prompt):
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
     }
-    response = requests.post(url, headers=headers, json=payload)
-    print("Ответ отправлен:", response.status_code, response.text)
+    payload = {
+        "model": "openchat/openchat-7b",
+        "messages": [
+            {"role": "system", "content": "Ты доброжелательный Instagram-ассистент, говоришь на русском."},
+            {"role": "user", "content": prompt}
+        ]
+    }
+    response = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers)
+    try:
+        return response.json()["choices"][0]["message"]["content"]
+    except:
+        return "Извини, произошла ошибка. Попробуй ещё раз."
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8080)
+
+def send_instagram_reply(recipient_id, message_text):
+    url = f"https://graph.facebook.com/v19.0/me/messages?access_token={ACCESS_TOKEN}"
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": {"text": message_text}
+    }
+    headers = {"Content-Type": "application/json"}
+    res = requests.post(url, json=payload, headers=headers)
+    print("Sent reply:", res.text)
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=8080)
