@@ -1,4 +1,8 @@
 Flask
-openai
 requests
+openai
+gspread
+oauth2client
+fastapi
+uvicorn[standard]
 python-dotenv
