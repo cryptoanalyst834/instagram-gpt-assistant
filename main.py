@@ -1,39 +1,46 @@
 import os
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, PlainTextResponse
+from flask import Flask, request, jsonify
+import requests
 from dotenv import load_dotenv
 
-# Загружаем переменные окружения
 load_dotenv()
 
-app = FastAPI()
+app = Flask(__name__)
 
-VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")  # токен подтверждения Instagram webhook
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
+APP_ID = os.getenv("APP_ID")
+APP_SECRET = os.getenv("APP_SECRET")
 
-@app.get("/")
-async def root():
-    return {"status": "AI24assistantBot is running ✅"}
+@app.route("/", methods=["GET"])
+def home():
+    return "AI24 Instagram Assistant Webhook is running!"
 
-# Instagram webhook verification
-@app.get("/webhook")
-async def verify_webhook(request: Request):
-    params = dict(request.query_params)
-    mode = params.get("hub.mode")
-    token = params.get("hub.verify_token")
-    challenge = params.get("hub.challenge")
+@app.route("/webhook", methods=["GET"])
+def verify_webhook():
+    mode = request.args.get("hub.mode")
+    token = request.args.get("hub.verify_token")
+    challenge = request.args.get("hub.challenge")
 
     if mode == "subscribe" and token == VERIFY_TOKEN:
-        return PlainTextResponse(content=challenge, status_code=200)
+        print("WEBHOOK_VERIFIED")
+        return challenge, 200
     else:
-        raise HTTPException(status_code=403, detail="Forbidden: Verification failed.")
+        return "Forbidden", 403
 
-# Instagram webhook POST handler
-@app.post("/webhook")
-async def handle_webhook(request: Request):
-    try:
-        data = await request.json()
-        print("📩 Incoming Webhook:", data)
-        return JSONResponse(content={"status": "received"}, status_code=200)
-    except Exception as e:
-        print("❌ Error handling webhook:", e)
-        raise HTTPException(status_code=400, detail="Invalid payload")
+@app.route("/webhook", methods=["POST"])
+def webhook_handler():
+    data = request.get_json()
+    print("Received webhook event:", data)
+
+    # Здесь можно добавить свою логику обработки входящих сообщений
+    return "EVENT_RECEIVED", 200
+
+@app.route("/access-token", methods=["GET"])
+def get_access_token():
+    url = f"https://graph.facebook.com/oauth/access_token" \
+          f"?client_id={APP_ID}&client_secret={APP_SECRET}&grant_type=client_credentials"
+    response = requests.get(url)
+    return jsonify(response.json())
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
